@@ -12,14 +12,15 @@ type state struct {
 	ID      int                    `json:"id"`
 	StateID string                 `json:"state_id"`
 	Data    map[string]interface{} `json:"data"`
-	Tag		string                 `json:"tag"`
+	Tag     string                 `json:"tag"`
 }
 
 type room struct {
-	Room      int                  `json:"room"`
-	Group  string                  `json:"group"`
-	NumUsers  int				   `json:"num_users"`
-	Users  interface{}  		   `json:"users"`
+	Room      int         `json:"room"`
+	Group     string      `json:"description"`
+	Questions bool        `json:"questions"`
+	NumUsers  int         `json:"num_users"`
+	Users     interface{} `json:"users"`
 }
 
 func getRooms(db *sql.DB) ([]room, error) {
@@ -43,8 +44,13 @@ func getRooms(db *sql.DB) ([]room, error) {
 			return nil, err
 		}
 
-		query := fmt.Sprintf("SELECT jsonb_path_query_array(data, '$.* ? (@.room == %v)') FROM state WHERE state_id = 'users'", r.Room)
-		err := db.QueryRow(query).Scan(&obj)
+		uq := fmt.Sprintf("SELECT jsonb_path_query_array(data, '$.* ? (@.room == %v)') FROM state WHERE state_id = 'users'", r.Room)
+		qq := fmt.Sprintf("SELECT jsonb_path_exists(data, '$.* ? (@.room == %v && @.question == true)') FROM state WHERE state_id = 'users'", r.Room)
+		err := db.QueryRow(uq).Scan(&obj)
+		if err != nil {
+			return nil, err
+		}
+		err = db.QueryRow(qq).Scan(&r.Questions)
 		if err != nil {
 			return nil, err
 		}
