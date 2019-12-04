@@ -25,7 +25,7 @@ type room struct {
 
 func getRooms(db *sql.DB) ([]room, error) {
 	rows, err := db.Query(
-		"SELECT DISTINCT jsonb_path_query(data, '$.*.room'), jsonb_path_query(data, '$.*.group') FROM state WHERE state_id = 'users'")
+		"with data as (SELECT jsonb_path_query(data, '$.*') as data FROM state WHERE state_id = 'users') select * from (select distinct on (room) (data -> 'room')::text::bigint as room,(data -> 'group')::text as group,(data -> 'timestamp')::text::bigint as stamp from data where (data -> 'room') is not null order by room,stamp)p order by stamp;")
 
 	if err != nil {
 		return nil, err
@@ -37,10 +37,11 @@ func getRooms(db *sql.DB) ([]room, error) {
 
 	for rows.Next() {
 		var r room
+		var st int
 		var o interface{}
 		var obj []byte
 		var grp []byte
-		if err := rows.Scan(&r.Room, &grp); err != nil {
+		if err := rows.Scan(&r.Room, &grp, &st); err != nil {
 			return nil, err
 		}
 
