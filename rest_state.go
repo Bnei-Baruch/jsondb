@@ -47,6 +47,20 @@ func (a *App) getRooms(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, states)
 }
 
+func (a *App) getRoom(w http.ResponseWriter, r *http.Request) {
+	var i room
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	err := i.getRoom(a.DB, id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, i)
+}
+
 func (a *App) getStates(w http.ResponseWriter, r *http.Request) {
 
 	states, err := getStates(a.DB)

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 )
 
 type state struct {
@@ -63,6 +64,38 @@ func getRooms(db *sql.DB) ([]room, error) {
 	}
 
 	return rooms, nil
+}
+
+func (r *room) getRoom(db *sql.DB, id string) error {
+	var o interface{}
+	var obj []byte
+	var grp []byte
+	rid, _ := strconv.Atoi(id)
+
+	rq := fmt.Sprintf("with data as (SELECT jsonb_path_query_first(data, '$.* ? (@.room == %v)') as data FROM state WHERE state_id = 'users') select * from (select  (data -> 'room')::text::bigint as room, (data -> 'group')::text as group from data) p", rid)
+	uq := fmt.Sprintf("SELECT jsonb_path_query_array(data, '$.* ? (@.room == %v)') FROM state WHERE state_id = 'users'", rid)
+	qq := fmt.Sprintf("SELECT jsonb_path_exists(data, '$.* ? (@.room == %v && @.question == true)') FROM state WHERE state_id = 'users'", rid)
+	err := db.QueryRow(rq).Scan(&r.Room, &grp)
+	if err != nil {
+		return err
+	}
+
+	err = db.QueryRow(uq).Scan(&obj)
+	if err != nil {
+		return err
+	}
+
+	err = db.QueryRow(qq).Scan(&r.Questions)
+	if err != nil {
+		return err
+	}
+
+	json.Unmarshal(obj, &o)
+	json.Unmarshal(grp, &r.Group)
+	r.Users = o
+	r.NumUsers = len(o.([]interface{}))
+
+	return nil
 }
 
 func findStates(db *sql.DB, key string, value string) ([]state, error) {
