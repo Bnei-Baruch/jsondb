@@ -44,6 +44,9 @@ func (a *App) Run(addr string) {
 
 func (a *App) initializeRoutes() {
 	a.Router.HandleFunc("/states", a.getStates).Methods("GET")
+	a.Router.HandleFunc("/galaxy/program/{id}", a.getProgram).Methods("GET")
+	a.Router.HandleFunc("/galaxy/groups", a.getGroups).Methods("GET")
+	a.Router.HandleFunc("/galaxy/group/{id}", a.postGroup).Methods("PUT")
 	a.Router.HandleFunc("/galaxy/rooms", a.getRooms).Methods("GET")
 	a.Router.HandleFunc("/galaxy/room/{id}", a.getRoom).Methods("GET")
 	a.Router.HandleFunc("/{tag}", a.getStateByTag).Methods("GET")

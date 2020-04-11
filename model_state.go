@@ -25,6 +25,78 @@ type room struct {
 	Users     interface{} `json:"users"`
 }
 
+type rooms struct {
+	Room        int    `json:"room"`
+	Janus       string `json:"janus"`
+	Description string `json:"description"`
+}
+
+func (s *state) getProgram(db *sql.DB, key string) error {
+	var obj []byte
+	err := db.QueryRow("SELECT data->>$2 FROM state where state_id = $1",
+		s.StateID, key).Scan(&obj)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(obj, &s.Data)
+
+	for k := range s.Data {
+		for c := range s.Data[k].([]interface{}) {
+			for range s.Data[k].([]interface{})[c].(map[string]interface{}) {
+				fmt.Printf("Room: [%s]\n", s.Data[k].([]interface{})[c].(map[string]interface{})["room"])
+				var q bool
+				qq := fmt.Sprintf("SELECT jsonb_path_exists(data, '$.* ? (@.room == %v && @.question == true)') FROM state WHERE state_id = 'users'", s.Data[k].([]interface{})[c].(map[string]interface{})["room"])
+				err = db.QueryRow(qq).Scan(&q)
+				if err != nil {
+					return err
+				}
+				s.Data[k].([]interface{})[c].(map[string]interface{})["questions"] = q
+			}
+		}
+	}
+
+	return err
+}
+
+func getGroups(db *sql.DB) (map[string]interface{}, error) {
+	rows, err := db.Query("SELECT * FROM rooms ORDER BY description")
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	json := make(map[string]interface{})
+	ar := []rooms{}
+
+	for rows.Next() {
+		var i rooms
+		if err := rows.Scan(&i.Room, &i.Janus, &i.Description); err != nil {
+			return nil, err
+		}
+		ar = append(ar, i)
+	}
+
+	json["rooms"] = ar
+
+	return json, nil
+}
+
+func (i *rooms) postGroup(db *sql.DB) error {
+
+	err := db.QueryRow(
+		"INSERT INTO rooms(room, janus, description) VALUES($1, $2, $3) ON CONFLICT (room) DO UPDATE SET (room, janus, description) = ($1, $2, $3) WHERE rooms.room = $1 RETURNING room",
+		i.Room, i.Janus, i.Description).Scan(&i.Room)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func getRooms(db *sql.DB) ([]room, error) {
 	rows, err := db.Query(
 		"with data as (SELECT jsonb_path_query(data, '$.*') as data FROM state WHERE state_id = 'users') select * from (select distinct on (room) (data -> 'janus')::text as janus,(data -> 'room')::text::bigint as room,(data -> 'group')::text as group,(data -> 'timestamp')::text::bigint as stamp from data where (data -> 'room') is not null order by room,stamp)p order by stamp;")
