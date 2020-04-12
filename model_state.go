@@ -42,16 +42,19 @@ func (s *state) getProgram(db *sql.DB, key string) error {
 	err = json.Unmarshal(obj, &s.Data)
 
 	for k := range s.Data {
-		for c := range s.Data[k].([]interface{}) {
-			for range s.Data[k].([]interface{})[c].(map[string]interface{}) {
-				fmt.Printf("Room: [%s]\n", s.Data[k].([]interface{})[c].(map[string]interface{})["room"])
-				var q bool
-				qq := fmt.Sprintf("SELECT jsonb_path_exists(data, '$.* ? (@.room == %v && @.question == true)') FROM state WHERE state_id = 'users'", s.Data[k].([]interface{})[c].(map[string]interface{})["room"])
-				err = db.QueryRow(qq).Scan(&q)
-				if err != nil {
-					return err
+		if _, ok := s.Data[k].([]interface{}); ok {
+			for c := range s.Data[k].([]interface{}) {
+				if _, ok := s.Data[k].([]interface{})[c].(map[string]interface{}); ok {
+					for range s.Data[k].([]interface{})[c].(map[string]interface{}) {
+						var q bool
+						qq := fmt.Sprintf("SELECT jsonb_path_exists(data, '$.* ? (@.room == %v && @.question == true)') FROM state WHERE state_id = 'users'", s.Data[k].([]interface{})[c].(map[string]interface{})["room"])
+						err = db.QueryRow(qq).Scan(&q)
+						if err != nil {
+							return err
+						}
+						s.Data[k].([]interface{})[c].(map[string]interface{})["questions"] = q
+					}
 				}
-				s.Data[k].([]interface{})[c].(map[string]interface{})["questions"] = q
 			}
 		}
 	}
